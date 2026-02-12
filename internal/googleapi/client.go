@@ -13,7 +13,6 @@ import (
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/option"
 
-	"github.com/steipete/gogcli/internal/authclient"
 	"github.com/steipete/gogcli/internal/bayloch"
 	"github.com/steipete/gogcli/internal/googleauth"
 )
@@ -94,7 +93,7 @@ func authenticatedTransport(ctx context.Context, serviceLabel string, email stri
 	var ts oauth2.TokenSource
 
 	if bayloch.IsConfigured() {
-		bts, err := bayloch.TokenSourceForService(serviceLabel)
+		bts, err := bayloch.TokenSourceForService(serviceLabel, email)
 		if err != nil {
 			return nil, fmt.Errorf("bayloch token source: %w", err)
 		}
@@ -107,7 +106,7 @@ func authenticatedTransport(ctx context.Context, serviceLabel string, email stri
 			return nil, fmt.Errorf("ADC token source: %w", err)
 		}
 		ts = adcTS
-	} else if serviceAccountTS, saPath, ok, err := tokenSourceForServiceAccountScopes(ctx, email, scopes); err != nil {
+	} else if serviceAccountTS, saPath, ok, err := tokenSourceForServiceAccountScopes(ctx, serviceLabel, email, scopes); err != nil {
 		return nil, fmt.Errorf("service account token source: %w", err)
 	} else if ok {
 		slog.Debug("using service account credentials", "email", email, "path", saPath)

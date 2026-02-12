@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"time"
 
 	"golang.org/x/oauth2"
@@ -15,6 +16,7 @@ import (
 type HTTPTokenSource struct {
 	cfg      *Config
 	provider string
+	email    string
 	client   *http.Client
 }
 
@@ -29,9 +31,12 @@ type tokenResponse struct {
 
 // Token fetches a fresh access token from the Bayloch dashboard.
 func (s *HTTPTokenSource) Token() (*oauth2.Token, error) {
-	url := fmt.Sprintf("%s/api/tokens/%s", s.cfg.URL, s.provider)
+	u := fmt.Sprintf("%s/api/tokens/%s", s.cfg.URL, s.provider)
+	if s.email != "" {
+		u += "?account=" + url.QueryEscape(s.email)
+	}
 
-	req, err := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequest("GET", u, nil)
 	if err != nil {
 		return nil, fmt.Errorf("bayloch: create request: %w", err)
 	}
