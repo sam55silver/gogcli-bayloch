@@ -9,7 +9,8 @@ import (
 
 // TokenSourceForService returns an oauth2.TokenSource that fetches tokens from
 // the Bayloch dashboard for the given gogcli service name.
-func TokenSourceForService(service string) (oauth2.TokenSource, error) {
+// If email is non-empty, it selects a specific account via ?account=<email>.
+func TokenSourceForService(service, email string) (oauth2.TokenSource, error) {
 	cfg, err := LoadConfig()
 	if err != nil {
 		return nil, err
@@ -23,6 +24,7 @@ func TokenSourceForService(service string) (oauth2.TokenSource, error) {
 	ts := &HTTPTokenSource{
 		cfg:      cfg,
 		provider: provider,
+		email:    email,
 		client:   &http.Client{Timeout: 10 * time.Second},
 	}
 

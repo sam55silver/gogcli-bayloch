@@ -17,7 +17,7 @@ type ConnectionInfo struct {
 }
 
 type connectionEntry struct {
-	Email       *string   `json:"email"`
+	Email       string    `json:"email"`
 	FolderName  *string   `json:"folderName"`
 	FolderID    *string   `json:"folderId"`
 	ConnectedAt time.Time `json:"connectedAt"`
@@ -56,24 +56,24 @@ func ListConnections() ([]ConnectionInfo, error) {
 		return nil, fmt.Errorf("bayloch: unexpected status %d: %s", resp.StatusCode, string(body))
 	}
 
-	var connectionsMap map[string]connectionEntry
+	var connectionsMap map[string][]connectionEntry
 	if err := json.Unmarshal(body, &connectionsMap); err != nil {
 		return nil, fmt.Errorf("bayloch: parse response: %w", err)
 	}
 
-	connections := make([]ConnectionInfo, 0, len(connectionsMap))
-	for provider, entry := range connectionsMap {
-		info := ConnectionInfo{
-			Provider:    provider,
-			ConnectedAt: entry.ConnectedAt,
+	var connections []ConnectionInfo
+	for provider, entries := range connectionsMap {
+		for _, entry := range entries {
+			info := ConnectionInfo{
+				Provider:    provider,
+				Email:       entry.Email,
+				ConnectedAt: entry.ConnectedAt,
+			}
+			if entry.FolderName != nil {
+				info.FolderName = *entry.FolderName
+			}
+			connections = append(connections, info)
 		}
-		if entry.Email != nil {
-			info.Email = *entry.Email
-		}
-		if entry.FolderName != nil {
-			info.FolderName = *entry.FolderName
-		}
-		connections = append(connections, info)
 	}
 
 	return connections, nil

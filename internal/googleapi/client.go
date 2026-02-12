@@ -134,7 +134,7 @@ func authenticatedTransportWithStoredScopeCheck(
 	var storedOAuth *persistingTokenSource
 
 	if bayloch.IsConfigured() {
-		bts, err := bayloch.TokenSourceForService(serviceLabel)
+		bts, err := bayloch.TokenSourceForService(serviceLabel, email)
 		if err != nil {
 			return nil, fmt.Errorf("bayloch token source: %w", err)
 		}
