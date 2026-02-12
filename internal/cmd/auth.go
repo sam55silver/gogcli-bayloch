@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/steipete/gogcli/internal/authclient"
+	"github.com/steipete/gogcli/internal/bayloch"
 	"github.com/steipete/gogcli/internal/config"
 	"github.com/steipete/gogcli/internal/googleauth"
 	"github.com/steipete/gogcli/internal/outfmt"
@@ -261,6 +262,9 @@ type AuthTokensDeleteCmd struct {
 }
 
 func (c *AuthTokensDeleteCmd) Run(ctx context.Context, flags *RootFlags) error {
+	if bayloch.IsConfigured() {
+		return fmt.Errorf("token management is handled by the Bayloch dashboard\nVisit: %s", bayloch.DashboardURL())
+	}
 	u := ui.FromContext(ctx)
 	email := strings.TrimSpace(c.Email)
 	if email == "" {
@@ -391,6 +395,9 @@ type AuthTokensImportCmd struct {
 }
 
 func (c *AuthTokensImportCmd) Run(ctx context.Context) error {
+	if bayloch.IsConfigured() {
+		return fmt.Errorf("token management is handled by the Bayloch dashboard\nVisit: %s", bayloch.DashboardURL())
+	}
 	u := ui.FromContext(ctx)
 	inPath := c.InPath
 	var b []byte
@@ -494,6 +501,9 @@ type AuthAddCmd struct {
 }
 
 func (c *AuthAddCmd) Run(ctx context.Context) error {
+	if bayloch.IsConfigured() {
+		return fmt.Errorf("token management is handled by the Bayloch dashboard\nVisit: %s", bayloch.DashboardURL())
+	}
 	u := ui.FromContext(ctx)
 
 	override := authclient.ClientOverrideFromContext(ctx)
@@ -756,6 +766,9 @@ func (c *AuthStatusCmd) Run(ctx context.Context, flags *RootFlags) error {
 }
 
 func (c *AuthListCmd) Run(ctx context.Context) error {
+	if bayloch.IsConfigured() {
+		return c.runBayloch(ctx)
+	}
 	u := ui.FromContext(ctx)
 	store, err := openSecretsStore()
 	if err != nil {
@@ -946,6 +959,64 @@ func (c *AuthListCmd) Run(ctx context.Context) error {
 	return nil
 }
 
+func (c *AuthListCmd) runBayloch(ctx context.Context) error {
+	u := ui.FromContext(ctx)
+	connections, err := bayloch.ListConnections()
+	if err != nil {
+		return err
+	}
+
+	if len(connections) == 0 {
+		if outfmt.IsJSON(ctx) {
+			return outfmt.WriteJSON(os.Stdout, map[string]any{"accounts": []any{}})
+		}
+		u.Err().Printf("No services connected — visit %s to connect", bayloch.DashboardURL())
+		return nil
+	}
+
+	sort.Slice(connections, func(i, j int) bool {
+		return connections[i].Provider < connections[j].Provider
+	})
+
+	if outfmt.IsJSON(ctx) {
+		type item struct {
+			Provider    string `json:"provider"`
+			Email       string `json:"email,omitempty"`
+			FolderName  string `json:"folder_name,omitempty"`
+			ConnectedAt string `json:"connected_at,omitempty"`
+			Auth        string `json:"auth"`
+		}
+		out := make([]item, 0, len(connections))
+		for _, conn := range connections {
+			created := ""
+			if !conn.ConnectedAt.IsZero() {
+				created = conn.ConnectedAt.UTC().Format(time.RFC3339)
+			}
+			out = append(out, item{
+				Provider:    conn.Provider,
+				Email:       conn.Email,
+				FolderName:  conn.FolderName,
+				ConnectedAt: created,
+				Auth:        "bayloch",
+			})
+		}
+		return outfmt.WriteJSON(os.Stdout, map[string]any{"accounts": out})
+	}
+
+	for _, conn := range connections {
+		created := ""
+		if !conn.ConnectedAt.IsZero() {
+			created = conn.ConnectedAt.UTC().Format(time.RFC3339)
+		}
+		detail := conn.Email
+		if conn.FolderName != "" {
+			detail = conn.Email + " (" + conn.FolderName + ")"
+		}
+		u.Out().Printf("%s\t%s\t%s\t%s", conn.Provider, detail, created, "bayloch")
+	}
+	return nil
+}
+
 func bestServiceAccountPathAndMtime(email string) (string, time.Time, bool) {
 	if p, err := config.ServiceAccountPath(email); err == nil {
 		if st, err := os.Stat(p); err == nil {
@@ -1002,6 +1073,9 @@ type AuthRemoveCmd struct {
 }
 
 func (c *AuthRemoveCmd) Run(ctx context.Context, flags *RootFlags) error {
+	if bayloch.IsConfigured() {
+		return fmt.Errorf("token management is handled by the Bayloch dashboard\nVisit: %s", bayloch.DashboardURL())
+	}
 	u := ui.FromContext(ctx)
 	email := strings.TrimSpace(c.Email)
 	if email == "" {
@@ -1042,6 +1116,9 @@ type AuthManageCmd struct {
 }
 
 func (c *AuthManageCmd) Run(ctx context.Context) error {
+	if bayloch.IsConfigured() {
+		return fmt.Errorf("token management is handled by the Bayloch dashboard\nVisit: %s", bayloch.DashboardURL())
+	}
 	services, err := parseAuthServices(c.ServicesCSV)
 	if err != nil {
 		return err

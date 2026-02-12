@@ -15,6 +15,7 @@ import (
 	"google.golang.org/api/option"
 
 	"github.com/steipete/gogcli/internal/authclient"
+	"github.com/steipete/gogcli/internal/bayloch"
 	"github.com/steipete/gogcli/internal/config"
 	"github.com/steipete/gogcli/internal/googleauth"
 	"github.com/steipete/gogcli/internal/secrets"
@@ -28,6 +29,10 @@ var (
 )
 
 func tokenSourceForAccount(ctx context.Context, service googleauth.Service, email string) (oauth2.TokenSource, error) {
+	if bayloch.IsConfigured() {
+		return bayloch.TokenSourceForService(string(service))
+	}
+
 	client, err := authclient.ResolveClient(ctx, email)
 	if err != nil {
 		return nil, fmt.Errorf("resolve client: %w", err)
@@ -99,7 +104,13 @@ func optionsForAccountScopes(ctx context.Context, serviceLabel string, email str
 
 	var ts oauth2.TokenSource
 
-	if serviceAccountTS, saPath, ok, err := tokenSourceForServiceAccountScopes(ctx, email, scopes); err != nil {
+	if bayloch.IsConfigured() {
+		bts, err := bayloch.TokenSourceForService(serviceLabel)
+		if err != nil {
+			return nil, fmt.Errorf("bayloch token source: %w", err)
+		}
+		ts = bts
+	} else if serviceAccountTS, saPath, ok, err := tokenSourceForServiceAccountScopes(ctx, email, scopes); err != nil {
 		return nil, fmt.Errorf("service account token source: %w", err)
 	} else if ok {
 		slog.Debug("using service account credentials", "email", email, "path", saPath)
