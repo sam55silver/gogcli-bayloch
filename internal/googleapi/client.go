@@ -12,6 +12,7 @@ import (
 	"google.golang.org/api/option"
 
 	"github.com/openclaw/gogcli/internal/authclient"
+	"github.com/openclaw/gogcli/internal/bayloch"
 	"github.com/openclaw/gogcli/internal/googleauth"
 	"github.com/openclaw/gogcli/internal/secrets"
 )
@@ -132,7 +133,14 @@ func authenticatedTransportWithStoredScopeCheck(
 	var ts oauth2.TokenSource
 	var storedOAuth *persistingTokenSource
 
-	if dependencies, ok := authDependenciesFromContext(ctx); ok && dependencies.Mode == AuthModeADC {
+	if bayloch.IsConfigured() {
+		bts, err := bayloch.TokenSourceForService(serviceLabel)
+		if err != nil {
+			return nil, fmt.Errorf("bayloch token source: %w", err)
+		}
+
+		ts = bts
+	} else if dependencies, ok := authDependenciesFromContext(ctx); ok && dependencies.Mode == AuthModeADC {
 		slog.Debug("using Application Default Credentials (GOG_AUTH_MODE=adc)", "serviceLabel", serviceLabel)
 
 		adcTS, err := dependencies.adcTokenSource(ctx, scopes)
