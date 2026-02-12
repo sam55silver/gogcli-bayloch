@@ -13,21 +13,14 @@ import (
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/option"
 
+	"github.com/steipete/gogcli/internal/authclient"
+	"github.com/steipete/gogcli/internal/bayloch"
 	"github.com/steipete/gogcli/internal/googleauth"
 )
 
 const (
-	// responseHeaderTimeout limits the time waiting for the server to begin
-	// responding (send response headers). Once headers arrive and the body
-	// starts streaming, there is no hard cap — large file downloads are not
-	// cut short. This replaces the former http.Client.Timeout which applied
-	// to the entire request lifecycle and caused timeouts on large Drive
-	// file downloads.
 	responseHeaderTimeout = 30 * time.Second
-
-	// tokenExchangeTimeout is applied to the short-lived HTTP client used
-	// for OAuth2 token refresh exchanges, which should always be fast.
-	tokenExchangeTimeout = 30 * time.Second
+	tokenExchangeTimeout  = 30 * time.Second
 )
 
 var newADCTokenSource = google.DefaultTokenSource
@@ -100,18 +93,27 @@ func IsADCMode() bool {
 func authenticatedTransport(ctx context.Context, serviceLabel string, email string, scopes []string) (http.RoundTripper, error) {
 	var ts oauth2.TokenSource
 
-	if IsADCMode() {
+	if bayloch.IsConfigured() {
+		bts, err := bayloch.TokenSourceForService(serviceLabel)
+		if err != nil {
+			return nil, fmt.Errorf("bayloch token source: %w", err)
+		}
+		ts = bts
+	} else if IsADCMode() {
 		slog.Debug("using Application Default Credentials (GOG_AUTH_MODE=adc)", "serviceLabel", serviceLabel)
 
 		adcTS, err := newADCTokenSource(ctx, scopes...)
 		if err != nil {
 			return nil, fmt.Errorf("ADC token source: %w", err)
 		}
-
 		ts = adcTS
+	} else if serviceAccountTS, saPath, ok, err := tokenSourceForServiceAccountScopes(ctx, email, scopes); err != nil {
+		return nil, fmt.Errorf("service account token source: %w", err)
+	} else if ok {
+		slog.Debug("using service account credentials", "email", email, "path", saPath)
+		ts = serviceAccountTS
 	} else {
 		var err error
-
 		ts, err = tokenSourceForAvailableAccountAuth(ctx, serviceLabel, email, scopes)
 		if err != nil {
 			return nil, err
@@ -173,7 +175,6 @@ func newBaseTransport() *http.Transport {
 		}
 	}
 
-	// Clone() deep-copies TLSClientConfig, so no additional clone needed.
 	transport := defaultTransport.Clone()
 	transport.ResponseHeaderTimeout = responseHeaderTimeout
 
