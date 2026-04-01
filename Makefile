@@ -3,7 +3,7 @@ SHELL := /bin/bash
 # `make` should build the binary by default.
 .DEFAULT_GOAL := build
 
-.PHONY: build build-safe gog gogcli gog-help gogcli-help help fmt fmt-check lint test ci tools pnpm-gate docs-commands docs-site docs-check
+.PHONY: build build-safe install gog gogcli gog-help gogcli-help help fmt fmt-check lint test ci tools pnpm-gate docs-commands docs-site docs-check
 .PHONY: worker-ci
 
 BIN_DIR := $(CURDIR)/bin
@@ -40,6 +40,11 @@ build:
 
 build-safe:
 	@./build-safe.sh $${PROFILE:-safety-profiles/agent-safe.yaml} -o $${OUTPUT:-$(BIN_DIR)/gog-safe}
+
+install: build
+	@echo "Installing gog to ~/.local/bin/gog"
+	@cp $(BIN) ~/.local/bin/gog
+	@echo "Installed: $$(~/.local/bin/gog --version 2>/dev/null || echo 'unknown version')"
 
 gog: build
 	@if [ -n "$(RUN_ARGS)" ]; then \
